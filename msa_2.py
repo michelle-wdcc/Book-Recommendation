@@ -61,17 +61,53 @@ for url in book_format_list:
     book_titles += [title_tag]
 
 # Construct a dataframe
-df = pd.DataFrame({'Book': book_titles, 'book_download_link':book_format_list,'book_chapter': book_texts})
+df = pd.DataFrame({'book': book_titles, 'book_download_link':book_format_list,'book_chapter': book_texts})
 # Put into .csv file
-with open("Book_download.csv", mode='w', newline='\n') as f:
-    df.to_csv(f, sep=",", line_terminator='\n', encoding='utf-8')
-#df.to_csv('Book_download.csv',encoding='utf-8', index=False)
+#with open("Book_download.csv", mode='w', newline='\n') as f:
+    #df.to_csv(f, sep=",", line_terminator='\n', encoding='utf-8')
+df.to_csv('Book_download.csv', encoding='utf-8-sig',index=False)
 data=pd.read_csv('Book_download.csv')
-for line in data:
-  line = re.sub(r"\\n\r", "", line)
+
+data['book_chapter']=data['book_chapter'].str.replace('\\n', ' ')
+data['book_chapter']=data['book_chapter'].str.replace('\\r', ' ')
+data['book_chapter']=data['book_chapter'].str.lower()
+data['book']=data['book'].str.replace('\\n', ' ')
+data['book']=data['book'].str.replace('\\r', ' ')
+data[:2]
+
+train_data=pd.read_csv('C:/Uni/MSA/train.csv')
+y=train_data.loc[:, 'target']
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 vectorizer = TfidfVectorizer(lowercase=True,token_pattern=r'(?u)\b[A-Za-z]+\b',stop_words='english',max_features=2000,strip_accents='unicode')
-X = vectorizer.fit_transform(data['book_chapter'].values)
-print(vectorizer.get_feature_names())
+X=vectorizer.fit_transform(train_data['excerpt'].values)
+#print(X)
 
+from sklearn.model_selection import train_test_split
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+
+pd.DataFrame(vectorizer.transform(train_data['excerpt'][[0]] ).toarray())
+X_train.toarray().shape
+from sklearn.neural_network import MLPRegressor
+regr = MLPRegressor(hidden_layer_sizes=(512,1024,1024,512 ))
+
+#data evaluation
+regr.fit(X_train,y_train)
+y_pred = regr.predict(X_val)
+regr.score(X_val,y_val)
+
+from sklearn.metrics import mean_squared_error
+import math
+mse = mean_squared_error(y_val,y_pred)
+math.sqrt(mse)
+
+#from sklearn.feature_extraction.text import TfidfVectorizer
+X_test=vectorizer.fit_transform(data['book_chapter'].values)
+
+
+y_test = regr.predict(X_test)
+
+# Construct a dataframe
+df = pd.DataFrame({'Book':data['book'].values, 'target': y_test})
+# Put into .csv file
+df.to_csv('submission.csv', index=False)
